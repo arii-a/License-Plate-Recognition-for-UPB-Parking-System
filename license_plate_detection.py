@@ -3,6 +3,7 @@ import numpy as np
 from ultralytics import YOLO
 import re
 import pytesseract
+from collections import Counter
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\Ariana\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
@@ -13,6 +14,7 @@ PLATE_REGEX = re.compile(r"^\d{4}[A-Z]{3}$")
 
 vehicle_model = YOLO(VEHICLE_MODEL_PATH)
 plate_model   = YOLO(PLATE_MODEL_PATH)
+
 
 
 def normalize_text(raw: str) -> str | None:
@@ -64,7 +66,7 @@ def normalize_text(raw: str) -> str | None:
 
 
 def preprocess_plate(plate_crop: np.ndarray) -> np.ndarray:
-    """Preprocesamiento optimizado para placas"""
+    # Preprocesamiento optimizado para placas
 
     h, w = plate_crop.shape[:2]
     if h < 60:
@@ -126,6 +128,9 @@ def main():
         print("Press 'q' to quit")
         
         frame_count = 0
+        count = 10
+        
+        plates = []
 
         for r in results:
             frame = r.orig_img
@@ -157,6 +162,7 @@ def main():
 
                 print(f"Found {len(plate_res.boxes)} potential plates")
 
+
                 for pbox in plate_res.boxes:
                     px1, py1, px2, py2 = map(int, pbox.xyxy[0].tolist())
                     px1 = max(0, px1); py1 = max(0, py1)
@@ -169,8 +175,17 @@ def main():
                     gx2, gy2 = vx1 + px2, vy1 + py2
                     
                     cv2.rectangle(annotated_frame, (gx1, gy1), (gx2, gy2), (0, 0, 255), 2)
-                    
+
                     plate_text = alpr_from_plate_crop(plate_crop)
+                    if count != 0 and plate_text != "NO_PLATE_FOUND":
+                        plates.append(plate_text)
+                        count -= 1
+                    elif count == 0:
+                        most_repeated = Counter(plates).most_common(1)
+                        if most_repeated:
+                            plate, occurrences = most_repeated[0]
+                            print(f"La placa más probable es: {plate} (apareció {occurrences} veces)")
+                       
                     print(f"OCR Result: {plate_text}")
 
                     if plate_text != "NO_PLATE_FOUND":
