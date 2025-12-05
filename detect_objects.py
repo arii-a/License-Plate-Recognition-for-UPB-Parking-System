@@ -1,4 +1,4 @@
-import cv2
+""" import cv2
 import numpy as np
 from ultralytics import YOLO
 import re
@@ -156,4 +156,4 @@ try:
     print("\nWebcam detection ended.")
     
 except Exception as e:
-    print(f"Ocurrió un error durante la detección: {e}")    
+    print(f"Ocurrió un error durante la detección: {e}")   """ 
