@@ -1,14 +1,20 @@
 import time
 from collections import Counter
+from datetime import datetime
+
+import requests
 
 class VehicleTracking: 
+    
+    BACKEND_EVENT_URL = "http://localhost:8000/api/v1/event/placa-detectada"
     
     def __init__(self, max_readings=10, timeout=5.0):
         self.vehicles = {}
         self.max_readings = max_readings
         self.timeout = timeout
+        
     
-    def update(self, track_id: int, plate_text: str) -> None:
+    def update(self, track_id: int, plate_text: str, color: str) -> None:
         current_time = time.time()
         
         if track_id not in self.vehicles:
@@ -16,7 +22,8 @@ class VehicleTracking:
                 'plates': [],
                 'last_seen': current_time,
                 'final_plate': None,
-                'confidence': 0
+                'confidence': 0,
+                'notified': False
             }
         
         vehicle = self.vehicles[track_id]
@@ -27,6 +34,9 @@ class VehicleTracking:
             
             if len(vehicle['plates']) >= self.max_readings:
                 self._finalize_plate(track_id)
+                
+                if vehicle['final_plate'] is not None and not vehicle['notified']:
+                    self._notify_backend(track_id, vehicle['final_plate'], color)
     
     def _finalize_plate(self, track_id: int) -> None:
         vehicle = self.vehicles[track_id]
@@ -46,6 +56,27 @@ class VehicleTracking:
         print(f"Placa: {plate}")
         print(f"Confianza: {vehicle['confidence']:.1f}% ({count}/{len(vehicle['plates'])})")
         print(f"{'='*50}\n")
+    
+    def _notify_backend(self, track_id: int, placa: str, color: str):
+        vehicle = self.vehicles[track_id]
+        
+        payload = {
+            "placa": placa,
+            "color": color,
+            "modelo": "N/A",
+        }
+        
+        try:
+            response = requests.post(self.BACKEND_EVENT_URL, json=payload, timeout=5)
+            response.raise_for_status() # Lanza HTTPError para 4xx/5xx
+            
+            vehicle['notified'] = True
+            print(f"Notificación de placa {placa} enviada con éxito. (ID: {track_id})")
+            
+        except requests.exceptions.RequestException as e:
+            print(f"ERROR al notificar (ID: {track_id}): {e}")
+            pass
+
     
     def get_vehicle_info(self, track_id: int) -> dict | None:
         if track_id not in self.vehicles:

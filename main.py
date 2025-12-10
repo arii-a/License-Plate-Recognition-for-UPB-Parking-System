@@ -1,10 +1,11 @@
 import cv2
 
-from models.detector import VehicleDetector, PlateDetector
+from models.detector import VehicleDetector, PlateDetector, ColorDetector
 from processors.image_processor import ImageProcessor
 from processors.ocr_processor import OCRProcessor
 from tracking.vehicle_tracking import VehicleTracking
 from utils.visualization import Visualizer
+from utils.notifier import notificar_placa_detectada
 
 
 def main():
@@ -15,6 +16,7 @@ def main():
         ocr_processor = OCRProcessor()
         tracker = VehicleTracking()
         visualizer = Visualizer()
+        color_detector = ColorDetector()
         
         results = vehicle_detector.track(
             source=0,
@@ -55,6 +57,8 @@ def main():
                 if vehicle_crop.size == 0:
                     continue
                 
+                color = color_detector.detect_color(vehicle_crop)
+                
                 info = tracker.get_vehicle_info(track_id)
                 if info:
                     visualizer.draw_vehicle_info(annotated_frame, track_id, info, box)
@@ -81,7 +85,8 @@ def main():
                     
                     plate_text = ocr_processor.read_plate(plate_crop)
                     
-                    tracker.update(track_id, plate_text)
+                    tracker.update(track_id, plate_text, color)
+                        
                     
                     detected = plate_text != "NO_PLATE_FOUND"
                     visualizer.draw_plate_box(annotated_frame, global_box, detected)
@@ -92,6 +97,11 @@ def main():
                             plate_text, 
                             (gx1, gy1 - 8)
                         )
+                        if tracker.vehicles[track_id]['final_plate'] is not None and tracker.vehicles[track_id]['notified'] == False:
+                            notificar_placa_detectada(
+                                tracker.vehicles[track_id]['final_plate'],
+                                color
+                            )
             
             cv2.imshow("ALPR System", annotated_frame)
             
